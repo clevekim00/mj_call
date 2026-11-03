@@ -26,9 +26,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Install Android build packages
+        shell: bash
+        run: |
+          sdk_manager="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort | tail -1)"
+          "$sdk_manager" 'platforms;android-35' 'build-tools;35.0.0' 
       - run: ./gradlew assembleDebug
         working-directory: apps/android
   windows:
