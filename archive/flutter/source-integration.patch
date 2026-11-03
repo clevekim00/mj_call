@@ -1,0 +1,465 @@
+diff --git a/README.en.md b/README.en.md
+index 125ec27..5f60993 100644
+--- a/README.en.md
++++ b/README.en.md
+@@ -16,6 +16,10 @@ The linked document site opens Korean and English in tabs on the same page. GitH
+ 
+ <!-- document-body -->
+ 
++## Call assistant
++
++**Today → Call assistant** prepares agency/customer service inquiries, speaks typed text and prepared phrases in Korean beside a separate speakerphone, and optionally records this device's microphone. Save notes, replay recordings, and delete the record and audio. Automatic AI replies and transcription are future work. [Usage and implementation limits (Korean)](docs/call-assist.md).
++
+ ## My sentences and easing tension
+ 
+ **Training → Sentence practice → Read my sentence twice** accepts reviewed text or OCR, keeps dated A/B recordings with individual AI feedback, and plays both sequentially for comparison. Recording/playback work offline; AI requires a configured model/server and upload consent.
+diff --git a/README.md b/README.md
+index 6e01192..b73f1fd 100644
+--- a/README.md
++++ b/README.md
+@@ -16,6 +16,10 @@
+ 
+ <!-- document-body -->
+ 
++## 통화 도우미
++
++**오늘 → 통화 도우미**에서 기관·고객센터 문의를 준비하고, 별도 전화기의 스피커폰 옆에서 입력한 글과 준비 문장을 한국어로 읽어 줍니다. 선택한 통화를 마이크로 녹음하고, 문의 메모와 함께 저장·재생·삭제할 수 있습니다. AI 자동 응답·자동 전사는 후속 범위입니다. [사용법·구현 범위](docs/call-assist.md).
++
+ ## 내 문장 연습과 긴장 낮추기
+ 
+ **훈련 → 문장으로 말하기 → 내 문장 두 번 읽기**에서 텍스트 또는 사진의 글을 확인하고, 문장마다 날짜별 1·2차 녹음과 개별 AI 피드백을 남깁니다. 두 녹음을 차례로 들어 비교할 수 있습니다. 녹음·듣기는 오프라인으로, AI는 별도 서버·모델과 전송 동의가 있을 때 사용합니다.
+diff --git a/ios/Podfile.lock b/ios/Podfile.lock
+index ea6fece..4e01a73 100644
+--- a/ios/Podfile.lock
++++ b/ios/Podfile.lock
+@@ -1,4 +1,7 @@
+ PODS:
++  - audioplayers_darwin (0.0.1):
++    - Flutter
++    - FlutterMacOS
+   - background_downloader (0.0.1):
+     - Flutter
+   - camera_avfoundation (0.0.1):
+@@ -53,6 +56,7 @@ PODS:
+     - FlutterMacOS
+ 
+ DEPENDENCIES:
++  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/darwin`)
+   - background_downloader (from `.symlinks/plugins/background_downloader/ios`)
+   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
+   - file_selector_ios (from `.symlinks/plugins/file_selector_ios/ios`)
+@@ -79,6 +83,8 @@ SPEC REPOS:
+     - TensorFlowLiteSwift
+ 
+ EXTERNAL SOURCES:
++  audioplayers_darwin:
++    :path: ".symlinks/plugins/audioplayers_darwin/darwin"
+   background_downloader:
+     :path: ".symlinks/plugins/background_downloader/ios"
+   camera_avfoundation:
+@@ -109,6 +115,7 @@ EXTERNAL SOURCES:
+     :path: ".symlinks/plugins/video_player_avfoundation/darwin"
+ 
+ SPEC CHECKSUMS:
++  audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
+   background_downloader: 50e91d979067b82081aba359d7d916b3ba5fadad
+   camera_avfoundation: 968a9a5323c79a99c166ad9d7866bfd2047b5a9b
+   CwlCatchException: 7acc161b299a6de7f0a46a6ed741eae2c8b4d75a
+diff --git a/ios/Runner/AppDelegate.swift b/ios/Runner/AppDelegate.swift
+index c5e416a..c572eb6 100644
+--- a/ios/Runner/AppDelegate.swift
++++ b/ios/Runner/AppDelegate.swift
+@@ -7,6 +7,68 @@ import record_ios
+ import Speech
+ import UIKit
+ 
++/// Shares the app's play-and-record session so speech does not end call capture.
++private final class CallAssistSpeech: NSObject, AVSpeechSynthesizerDelegate {
++  private let synthesizer = AVSpeechSynthesizer()
++  private var pending: FlutterResult?
++  private var utterance: AVSpeechUtterance?
++
++  override init() {
++    super.init()
++    synthesizer.delegate = self
++    synthesizer.usesApplicationAudioSession = true
++  }
++
++  func speak(_ text: String, result: @escaping FlutterResult) {
++    stop()
++    guard let voice = AVSpeechSynthesisVoice(language: "ko-KR") else {
++      result(FlutterError(code: "voice_missing", message: "Install a Korean voice.", details: nil))
++      return
++    }
++    do {
++      let session = AVAudioSession.sharedInstance()
++      // Avoid changing the route/category while a recorder is already running.
++      if session.category != .playAndRecord {
++        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
++      }
++      try session.setActive(true)
++      let next = AVSpeechUtterance(string: text)
++      next.voice = voice
++      next.rate = 0.42
++      next.volume = 1
++      utterance = next
++      pending = result
++      synthesizer.speak(next)
++    } catch {
++      result(FlutterError(code: "speech_failed", message: "Could not play speech.", details: nil))
++    }
++  }
++
++  func stop() {
++    let result = pending
++    pending = nil
++    utterance = nil
++    synthesizer.stopSpeaking(at: .immediate)
++    result?(nil)
++  }
++
++  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
++                         didFinish utterance: AVSpeechUtterance) {
++    finish(utterance)
++  }
++  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
++                         didCancel utterance: AVSpeechUtterance) {
++    finish(utterance)
++  }
++  private func finish(_ finished: AVSpeechUtterance) {
++    guard finished === utterance else { return }
++    let result = pending
++    pending = nil
++    utterance = nil
++    result?(nil)
++  }
++}
++
+ @objc(SafeFlutterViewController)
+ final class SafeFlutterViewController: FlutterViewController {
+   private var windowLayoutChannel: FlutterMethodChannel?
+@@ -56,6 +118,7 @@ final class SafeFlutterViewController: FlutterViewController {
+   private var audioRecorder: AVAudioRecorder?
+   private var audioRecorderPath: String?
+   private let speechSynthesizer = AVSpeechSynthesizer()
++  private let callSpeech = CallAssistSpeech()
+   private var audioEventSink: FlutterEventSink?
+   private var speechEventSink: FlutterEventSink?
+   private var speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "ko-KR"))
+@@ -130,6 +193,16 @@ final class SafeFlutterViewController: FlutterViewController {
+         return
+       }
+       switch call.method {
++      case "callSpeak":
++        guard let arguments = call.arguments as? [String: Any],
++              let text = arguments["text"] as? String, !text.isEmpty else {
++          result(FlutterError(code: "invalid_args", message: "Missing speech text.", details: nil))
++          return
++        }
++        self.callSpeech.speak(text, result: result)
++      case "callStop":
++        self.callSpeech.stop()
++        result(nil)
+       case "speak":
+         guard
+           let arguments = call.arguments as? [String: Any],
+@@ -339,6 +412,8 @@ final class SafeFlutterViewController: FlutterViewController {
+       switch call.method {
+       case "hasPermission":
+         self.requestRecordPermission(result: result)
++      case "isRecording":
++        result(self.audioRecorder?.isRecording ?? false)
+       case "start":
+         guard
+           let arguments = call.arguments as? [String: Any],
+diff --git a/lib/features/practice/view/practice_mode_selection_screen.dart b/lib/features/practice/view/practice_mode_selection_screen.dart
+index f7f2512..16d88d9 100644
+--- a/lib/features/practice/view/practice_mode_selection_screen.dart
++++ b/lib/features/practice/view/practice_mode_selection_screen.dart
+@@ -1,4 +1,5 @@
+ import 'package:flutter/material.dart';
++import 'package:speech_rehab/features/call_assist/view/call_assist_screens.dart';
+ import 'package:speech_rehab/services/rehab_profile_service.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:speech_rehab/features/rehab/model/rehab_session.dart';
+@@ -55,6 +56,15 @@ class _HomeState extends ConsumerState<PracticeModeSelectionScreen> {
+             ),
+           ),
+         const SizedBox(height: 24),
++        RehabCard(
++          title: en ? 'Call assistant' : '통화 도우미',
++          subtitle: en
++              ? 'Prepare an inquiry, type to speak, and record a speakerphone call'
++              : '기관·고객센터 문의 준비 · 직접 입력해 말하기 · 녹음',
++          icon: Icons.phone_in_talk_outlined,
++          onTap: () => _open(const CallAssistHomeScreen()),
++        ),
++        const SizedBox(height: 20),
+         sessions.when(
+           loading: () => const Center(child: CircularProgressIndicator()),
+           error: (_, _) => Column(
+diff --git a/lib/features/rehab/view/rehab_records_screen.dart b/lib/features/rehab/view/rehab_records_screen.dart
+index 2b92c05..48e969c 100644
+--- a/lib/features/rehab/view/rehab_records_screen.dart
++++ b/lib/features/rehab/view/rehab_records_screen.dart
+@@ -4,6 +4,7 @@ import '../mpt/mpt_result.dart';
+ import 'dart:async';
+ import '../audio/practice_waveform.dart';
+ import 'dart:io';
++import 'package:speech_rehab/features/call_assist/view/call_assist_screens.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:share_plus/share_plus.dart';
+@@ -104,6 +105,16 @@ class _RecordsState extends ConsumerState<RehabRecordsScreen> {
+       appBar: AppBar(
+         title: Text(l.rehabRecords),
+         actions: [
++          IconButton(
++            tooltip: en ? 'Call records' : '통화 기록',
++            onPressed: () => Navigator.push(
++              context,
++              MaterialPageRoute<void>(
++                builder: (_) => const CallAssistHomeScreen(),
++              ),
++            ),
++            icon: const Icon(Icons.phone_in_talk_outlined),
++          ),
+           IconButton(
+             tooltip: l.rehabRetry,
+             onPressed: () => setState(_reload),
+diff --git a/lib/services/audio/audio_recorder_service.dart b/lib/services/audio/audio_recorder_service.dart
+index e58263a..31baca1 100644
+--- a/lib/services/audio/audio_recorder_service.dart
++++ b/lib/services/audio/audio_recorder_service.dart
+@@ -153,4 +153,12 @@ class AudioRecorderService {
+   }
+ 
+   bool isRecording() => _isRecording;
++
++  /// Query the device as well: an audio interruption can stop native capture.
++  Future<bool> checkIsRecording() async {
++    if (!_isRecording) return false;
++    return _useIosNative
++        ? await _iosRecorderChannel.invokeMethod<bool>('isRecording') ?? false
++        : await _recorder.isRecording();
++  }
+ }
+diff --git a/linux/flutter/generated_plugin_registrant.cc b/linux/flutter/generated_plugin_registrant.cc
+index 76facc2..7ca4c4d 100644
+--- a/linux/flutter/generated_plugin_registrant.cc
++++ b/linux/flutter/generated_plugin_registrant.cc
+@@ -6,12 +6,16 @@
+ 
+ #include "generated_plugin_registrant.h"
+ 
++#include <audioplayers_linux/audioplayers_linux_plugin.h>
+ #include <file_selector_linux/file_selector_plugin.h>
+ #include <flutter_gemma/flutter_gemma_plugin.h>
+ #include <record_linux/record_linux_plugin.h>
+ #include <url_launcher_linux/url_launcher_plugin.h>
+ 
+ void fl_register_plugins(FlPluginRegistry* registry) {
++  g_autoptr(FlPluginRegistrar) audioplayers_linux_registrar =
++      fl_plugin_registry_get_registrar_for_plugin(registry, "AudioplayersLinuxPlugin");
++  audioplayers_linux_plugin_register_with_registrar(audioplayers_linux_registrar);
+   g_autoptr(FlPluginRegistrar) file_selector_linux_registrar =
+       fl_plugin_registry_get_registrar_for_plugin(registry, "FileSelectorPlugin");
+   file_selector_plugin_register_with_registrar(file_selector_linux_registrar);
+diff --git a/linux/flutter/generated_plugins.cmake b/linux/flutter/generated_plugins.cmake
+index 58f9b8a..3051c9d 100644
+--- a/linux/flutter/generated_plugins.cmake
++++ b/linux/flutter/generated_plugins.cmake
+@@ -3,6 +3,7 @@
+ #
+ 
+ list(APPEND FLUTTER_PLUGIN_LIST
++  audioplayers_linux
+   file_selector_linux
+   flutter_gemma
+   record_linux
+diff --git a/macos/Flutter/GeneratedPluginRegistrant.swift b/macos/Flutter/GeneratedPluginRegistrant.swift
+index ecfe0c0..3cb7de9 100644
+--- a/macos/Flutter/GeneratedPluginRegistrant.swift
++++ b/macos/Flutter/GeneratedPluginRegistrant.swift
+@@ -5,6 +5,7 @@
+ import FlutterMacOS
+ import Foundation
+ 
++import audioplayers_darwin
+ import file_selector_macos
+ import flutter_gemma
+ import flutter_tts
+@@ -15,6 +16,7 @@ import speech_to_text
+ import video_player_avfoundation
+ 
+ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
++  AudioplayersDarwinPlugin.register(with: registry.registrar(forPlugin: "AudioplayersDarwinPlugin"))
+   FileSelectorPlugin.register(with: registry.registrar(forPlugin: "FileSelectorPlugin"))
+   FlutterGemmaPlugin.register(with: registry.registrar(forPlugin: "FlutterGemmaPlugin"))
+   FlutterTtsPlugin.register(with: registry.registrar(forPlugin: "FlutterTtsPlugin"))
+diff --git a/macos/Podfile.lock b/macos/Podfile.lock
+index e4e9a7d..84cb3e0 100644
+--- a/macos/Podfile.lock
++++ b/macos/Podfile.lock
+@@ -1,4 +1,7 @@
+ PODS:
++  - audioplayers_darwin (0.0.1):
++    - Flutter
++    - FlutterMacOS
+   - CwlCatchException (2.2.1):
+     - CwlCatchExceptionSupport (~> 2.2.1)
+   - CwlCatchExceptionSupport (2.2.1)
+@@ -25,6 +28,7 @@ PODS:
+     - FlutterMacOS
+ 
+ DEPENDENCIES:
++  - audioplayers_darwin (from `Flutter/ephemeral/.symlinks/plugins/audioplayers_darwin/darwin`)
+   - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
+   - flutter_gemma (from `Flutter/ephemeral/.symlinks/plugins/flutter_gemma/macos`)
+   - flutter_tts (from `Flutter/ephemeral/.symlinks/plugins/flutter_tts/macos`)
+@@ -41,6 +45,8 @@ SPEC REPOS:
+     - CwlCatchExceptionSupport
+ 
+ EXTERNAL SOURCES:
++  audioplayers_darwin:
++    :path: Flutter/ephemeral/.symlinks/plugins/audioplayers_darwin/darwin
+   file_selector_macos:
+     :path: Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos
+   flutter_gemma:
+@@ -61,6 +67,7 @@ EXTERNAL SOURCES:
+     :path: Flutter/ephemeral/.symlinks/plugins/video_player_avfoundation/darwin
+ 
+ SPEC CHECKSUMS:
++  audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
+   CwlCatchException: 7acc161b299a6de7f0a46a6ed741eae2c8b4d75a
+   CwlCatchExceptionSupport: 54ccab8d8c78907b57f99717fb19d4cc3bce02dc
+   file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
+diff --git a/pubspec.lock b/pubspec.lock
+index 181fde4..e5ac5c6 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -33,6 +33,62 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "2.13.1"
++  audioplayers:
++    dependency: "direct main"
++    description:
++      name: audioplayers
++      sha256: a72dd459d1a48f61a6fb9c0134dba26597c9236af40639ff0eb70eb4e0baab70
++      url: "https://pub.dev"
++    source: hosted
++    version: "6.6.0"
++  audioplayers_android:
++    dependency: transitive
++    description:
++      name: audioplayers_android
++      sha256: "60a6728277228413a85755bd3ffd6fab98f6555608923813ce383b190a360605"
++      url: "https://pub.dev"
++    source: hosted
++    version: "5.2.1"
++  audioplayers_darwin:
++    dependency: transitive
++    description:
++      name: audioplayers_darwin
++      sha256: c994b3bb3a921e4904ac40e013fbc94488e824fd7c1de6326f549943b0b44a91
++      url: "https://pub.dev"
++    source: hosted
++    version: "6.4.0"
++  audioplayers_linux:
++    dependency: transitive
++    description:
++      name: audioplayers_linux
++      sha256: f75bce1ce864170ef5e6a2c6a61cd3339e1a17ce11e99a25bae4474ea491d001
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.2.1"
++  audioplayers_platform_interface:
++    dependency: transitive
++    description:
++      name: audioplayers_platform_interface
++      sha256: "0e2f6a919ab56d0fec272e801abc07b26ae7f31980f912f24af4748763e5a656"
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.1.1"
++  audioplayers_web:
++    dependency: transitive
++    description:
++      name: audioplayers_web
++      sha256: faa8fa6587f996a6f604433b53af44c57a1407d4fe8dff5766cf63d6875e8de9
++      url: "https://pub.dev"
++    source: hosted
++    version: "5.2.0"
++  audioplayers_windows:
++    dependency: transitive
++    description:
++      name: audioplayers_windows
++      sha256: bafff2b38b6f6d331887558ba6e0a01c9c208d9dbb3ad0005234db065122a734
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.3.0"
+   background_downloader:
+     dependency: transitive
+     description:
+@@ -726,7 +782,7 @@ packages:
+     source: hosted
+     version: "2.2.1"
+   path_provider_platform_interface:
+-    dependency: transitive
++    dependency: "direct dev"
+     description:
+       name: path_provider_platform_interface
+       sha256: "88f5779f72ba699763fa3a3b06aa4bf6de76c8e5de842cf6f29e2e06476c2334"
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 5bf4d74..2f65066 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -39,6 +39,7 @@ dependencies:
+   flutter_riverpod: ^3.3.1
+   speech_to_text: ^7.3.0
+   flutter_tts: ^4.2.5
++  audioplayers: ^6.6.0
+   dio: ^5.9.2
+   flutter_gemma: ^0.12.6
+   uuid: ^4.0.0
+@@ -58,6 +59,7 @@ dependencies:
+   file_selector: ^1.1.0
+   image_picker: ^1.2.3
+ dev_dependencies:
++  path_provider_platform_interface: ^2.1.2
+   flutter_test:
+     sdk: flutter
+ 
+diff --git a/windows/flutter/generated_plugin_registrant.cc b/windows/flutter/generated_plugin_registrant.cc
+index ab3c2e4..a31dcea 100644
+--- a/windows/flutter/generated_plugin_registrant.cc
++++ b/windows/flutter/generated_plugin_registrant.cc
+@@ -6,6 +6,7 @@
+ 
+ #include "generated_plugin_registrant.h"
+ 
++#include <audioplayers_windows/audioplayers_windows_plugin.h>
+ #include <file_selector_windows/file_selector_windows.h>
+ #include <flutter_gemma/flutter_gemma_plugin.h>
+ #include <flutter_tts/flutter_tts_plugin.h>
+@@ -16,6 +17,8 @@
+ #include <url_launcher_windows/url_launcher_windows.h>
+ 
+ void RegisterPlugins(flutter::PluginRegistry* registry) {
++  AudioplayersWindowsPluginRegisterWithRegistrar(
++      registry->GetRegistrarForPlugin("AudioplayersWindowsPlugin"));
+   FileSelectorWindowsRegisterWithRegistrar(
+       registry->GetRegistrarForPlugin("FileSelectorWindows"));
+   FlutterGemmaPluginRegisterWithRegistrar(
+diff --git a/windows/flutter/generated_plugins.cmake b/windows/flutter/generated_plugins.cmake
+index d89ae74..7eb1c9b 100644
+--- a/windows/flutter/generated_plugins.cmake
++++ b/windows/flutter/generated_plugins.cmake
+@@ -3,6 +3,7 @@
+ #
+ 
+ list(APPEND FLUTTER_PLUGIN_LIST
++  audioplayers_windows
+   file_selector_windows
+   flutter_gemma
+   flutter_tts

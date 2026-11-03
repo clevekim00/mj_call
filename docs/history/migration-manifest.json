@@ -1,0 +1,67 @@
+[
+  {
+    "source": "lib/features/call_assist/model/call_record.dart",
+    "archive": "archive/flutter/lib/features/call_assist/model/call_record.dart",
+    "sha256": "885121acb2a7e3abfca0ad226cc9d49f13a1b219e178d839bec94e2822a5f0c7"
+  },
+  {
+    "source": "lib/features/call_assist/services/call_audio.dart",
+    "archive": "archive/flutter/lib/features/call_assist/services/call_audio.dart",
+    "sha256": "37bcfdf56a6d08010e2b93cddd092b02c7e84fa00afaba03d165f50eab39d2bb"
+  },
+  {
+    "source": "lib/features/call_assist/services/call_controller.dart",
+    "archive": "archive/flutter/lib/features/call_assist/services/call_controller.dart",
+    "sha256": "47786edc56f464cfd950f095d3314c122d16cdea4e484caf75e5df7fbcfea180"
+  },
+  {
+    "source": "lib/features/call_assist/services/call_repository.dart",
+    "archive": "archive/flutter/lib/features/call_assist/services/call_repository.dart",
+    "sha256": "c764f5287cd8d97a39a955b49878946af2bb0b42c03acbe24c31ee7b728f6445"
+  },
+  {
+    "source": "lib/features/call_assist/view/call_assist_screens.dart",
+    "archive": "archive/flutter/lib/features/call_assist/view/call_assist_screens.dart",
+    "sha256": "48eafd3103c1755f62a58ecd7256d71546b037f346d8b4eddbc0944995ad18fb"
+  },
+  {
+    "source": "test/call_assist_test.dart",
+    "archive": "archive/flutter/test/call_assist_test.dart",
+    "sha256": "66a98a2f43dad973f441a2bc2dc361f6e9c1d561df463c447da6e278bd40d068"
+  },
+  {
+    "source": "lib/services/audio/audio_recorder_service.dart",
+    "archive": "archive/flutter/lib/services/audio/audio_recorder_service.dart",
+    "sha256": "ba557badc35147b93f122c6cb8693b2cdcef7c1604e840c384b9c456893170f5"
+  },
+  {
+    "source": "lib/services/audio/audio_player_service.dart",
+    "archive": "archive/flutter/lib/services/audio/audio_player_service.dart",
+    "sha256": "d8de081f62876ef09de29c625721594fe3f981340c3a7ccb15a4a747647eac8a"
+  },
+  {
+    "source": "lib/services/audio/tts_service.dart",
+    "archive": "archive/flutter/lib/services/audio/tts_service.dart",
+    "sha256": "97453f2808fc732a65dd0011aa3b7c8632caf661e4e3cd139c0e727500d4f925"
+  },
+  {
+    "source": "lib/services/microphone_access.dart",
+    "archive": "archive/flutter/lib/services/microphone_access.dart",
+    "sha256": "0c55133c6bdf131ec835a5233df3d60dada8c93912d9e8f8339dd5583ecbc362"
+  },
+  {
+    "source": "blueprint-assisted-phone-call.md",
+    "archive": "docs/history/blueprint-assisted-phone-call.md",
+    "sha256": "71e6b617ddc76492c94900cb69b50f5258d51de2f47f5cd9d4ff1647101b919a"
+  },
+  {
+    "source": "docs/call-assist.md",
+    "archive": "docs/history/flutter-implementation.md",
+    "sha256": "ed0aa5075f609e6a5b235b8968c2f6b7ad831187a7784de1a2f92c037ee8922f"
+  },
+  {
+    "source": "LICENSE",
+    "archive": "LICENSE",
+    "sha256": "6b3dd7520c35d79badf8d18b157b0e0fd86ea2c3fddcbcaebf88ffb30c46cf17"
+  }
+]

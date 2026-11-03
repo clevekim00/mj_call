@@ -1,0 +1,41 @@
+name: Native builds
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  apple:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        platform: [macOS, iOS]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify archive
+        run: python3 scripts/verify_migration.py
+      - name: Build macOS
+        if: matrix.platform == 'macOS'
+        run: xcodebuild -project apps/apple/MJCall.xcodeproj -scheme MJCall-macOS CODE_SIGNING_ALLOWED=NO build
+      - name: Build iPhone and iPad
+        if: matrix.platform == 'iOS'
+        run: xcodebuild -project apps/apple/MJCall.xcodeproj -scheme MJCall-iOS -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: ./gradlew assembleDebug
+        working-directory: apps/android
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build apps/windows/MJCall.csproj -c Debug

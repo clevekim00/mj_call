@@ -1,0 +1,26 @@
+# User data and build products
+.DS_Store
+.build/
+build/
+DerivedData/
+.gradle/
+local.properties
+bin/
+obj/
+.vs/
+*.user
+*.xcuserstate
+xcuserdata/
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+*.m4a
+*.wav
+*.mp3
+*.mp4
+recordings/
+records.json
