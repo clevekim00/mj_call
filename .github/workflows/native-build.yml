@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           sdk_manager="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort | tail -1)"
-          "$sdk_manager" 'platforms;android-35' 'build-tools;35.0.0' 
+          "$sdk_manager" 'platforms;android-35' 'build-tools;35.0.0'
       - run: ./gradlew assembleDebug
         working-directory: apps/android
   windows:

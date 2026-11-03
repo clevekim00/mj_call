@@ -13,7 +13,7 @@
 | 녹음 중지·저장·재생·삭제 | 작성 | 작성 | 작성 |
 | 문의 결과·메모 | 작성 | 작성 | 작성 |
 | 화면 이탈 처리 | background 저장 시도 | onPause 저장 시도 | 창 닫기 시 저장 시도 |
-| 실제 빌드 확인 | 아래 검증 기록 참고 | 로컬 Android SDK 없음 | 로컬 .NET/Windows 없음 |
+| 실제 빌드 확인 | 로컬·CI 성공 | CI assembleDebug 성공 | CI .NET 빌드 성공 |
 | 실제 스피커폰 통화 품질 | 미검증 | 미검증 | 미검증 |
 
 빌드 결과는 docs/VALIDATION.md에 기록한다. GitHub Actions는 세 플랫폼 컴파일을 재현한다. 서명·배포는 수행하지 않는다.
